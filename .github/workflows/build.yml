@@ -51,18 +51,26 @@ jobs:
       run: |
         unzip a-shell.ipa -d a-shell
         
-        cp TerminalSBX.dylib a-shell/Payload/a-Shell.app/
+        # Handle both a-Shell.app and Terminal.app
+        APP_PATH="a-shell/Payload/a-Shell.app"
+        if [ -d "a-shell/Payload/Terminal.app" ]; then
+          APP_PATH="a-shell/Payload/Terminal.app"
+        fi
+        
+        echo "Using app path: $APP_PATH"
+        
+        cp TerminalSBX.dylib "$APP_PATH/"
         
         plutil -replace CFBundleIdentifier -string "com.jasonquiles.terminal" \
-          a-shell/Payload/a-Shell.app/Info.plist
+          "$APP_PATH/Info.plist"
         
         codesign --force --sign - \
           --entitlements entitlements.plist \
-          a-shell/Payload/a-Shell.app/TerminalSBX.dylib
+          "$APP_PATH/TerminalSBX.dylib"
         
         codesign --force --sign - \
           --entitlements entitlements.plist \
-          a-shell/Payload/a-Shell.app
+          "$APP_PATH"
         
         cd a-shell
         zip -r Terminal_worse.ipa Payload/
