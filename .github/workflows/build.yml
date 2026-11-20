@@ -53,15 +53,26 @@ jobs:
         
         unzip a-shell.ipa -d a-shell
         
+        # Fix permissions on extracted files
+        echo "=== Fixing permissions ==="
+        chmod -R 755 a-shell/ || true
+        
         # Find the app
         echo "=== Looking for app ==="
-        ls -la a-shell/Payload/
+        ls -la a-shell/Payload/ || true
         
-        APP_PATH=$(find a-shell/Payload -name "*.app" -type d | head -1)
+        APP_PATH=$(find a-shell/Payload -name "*.app" -type d 2>/dev/null | head -1)
         echo "Found app: $APP_PATH"
         
         if [ -z "$APP_PATH" ]; then
           echo "ERROR: No .app found in Payload"
+          # Try alternative find
+          APP_PATH=$(find a-shell -name "*.app" -type d 2>/dev/null | head -1)
+          echo "Alternative found: $APP_PATH"
+        fi
+        
+        if [ -z "$APP_PATH" ]; then
+          echo "ERROR: Still no .app found"
           exit 1
         fi
         
