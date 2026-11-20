@@ -66,40 +66,9 @@ jobs:
         
         cp TerminalSBX.dylib "$APP_PATH/"
         
-        # Use Python to fix all Bundle IDs (single line)
+        # Use Python to fix all Bundle IDs (base64 encoded)
         echo "=== Fixing Bundle IDs with Python ==="
-        python3 -c "
-import os
-import plistlib
-
-app_path = '$APP_PATH'
-print(f'Processing: {app_path}')
-
-for root, dirs, files in os.walk(app_path):
-    for file in files:
-        if file == 'Info.plist':
-            plist_path = os.path.join(root, file)
-            print(f'Found: {plist_path}')
-            try:
-                with open(plist_path, 'rb') as f:
-                    plist = plistlib.load(f)
-                old_bid = plist.get('CFBundleIdentifier', '')
-                print(f'  Old: {old_bid}')
-                if '623SFGS4B7' in old_bid:
-                    new_bid = old_bid.replace('.623SFGS4B7', '')
-                    plist['CFBundleIdentifier'] = new_bid
-                    print(f'  New: {new_bid}')
-                elif 'com.apple.Terminal' in old_bid:
-                    new_bid = old_bid.replace('com.apple.Terminal', 'com.jasonquiles.terminal')
-                    plist['CFBundleIdentifier'] = new_bid
-                    print(f'  New: {new_bid}')
-                with open(plist_path, 'wb') as f:
-                    plistlib.dump(plist, f)
-                print('  Updated')
-            except Exception as e:
-                print(f'  Error: {e}')
-print('Done')
-"
+        echo "aW1wb3J0IG9zCmltcG9ydCBwbGlzdGxpYgoKYXBwX3BhdGggPSAnJEFQUF9QQVRIJwpwcmludChmJ1Byb2Nlc3Npbmc6IHthcHBfcGF0aH0nKQoKZm9yIHJvb3QsIGRpcnMsIGZpbGVzIGluIG9zLndhbGsoYXBwX3BhdGgpOgogICAgZm9yIGZpbGUgaW4gZmlsZXM6CiAgICAgICAgaWYgZmlsZSA9PSAnSW5mby5wbGlzdCc6CiAgICAgICAgICAgIHBsaXN0X3BhdGggPSBvcy5wYXRoLmpvaW4ocm9vdCwgZmlsZSkKICAgICAgICAgICAgcHJpbnQoZidGb3VuZDoge3BsaXN0X3BhdGh9JykKICAgICAgICAgICAgdHJ5OgogICAgICAgICAgICAgICAgd2l0aCBvcGVuKHBsaXN0X3BhdGgsICdyYicpIGFzIGY6CiAgICAgICAgICAgICAgICAgICAgcGxpc3QgPSBwbGlzdGxpYi5sb2FkKGYpCiAgICAgICAgICAgICAgICBvbGRfYmlkID0gcGxpc3QuZ2V0KCdDRkJ1bmRsZUlkZW50aWZpZXInLCAnJykKICAgICAgICAgICAgICAgIHByaW50KGYnICBPbGQ6IHtvbGRfYmlkfScpCiAgICAgICAgICAgICAgICBpZiAnNjIzU0ZHUzVCNycgaW4gb2xkX2JpZDoKICAgICAgICAgICAgICAgICAgICBuZXdfYmlkID0gb2xkX2JpZC5yZXBsYWNlKCcuNjIzU0ZHUzVCNycsICcnKQogICAgICAgICAgICAgICAgICAgIHBsaXN0WydDRkJ1bmRsZUlkZW50aWZpZXInXSA9IG5ld19iaWQKICAgICAgICAgICAgICAgICAgICBwcmludChmJyAgTmV3OiB7bmV3X2JpZH0nKQogICAgICAgICAgICAgICAgZWxpZiAnY29tLmFwcGxlLlRlcm1pbmFsJyBpbiBvbGRfYmlkOgogICAgICAgICAgICAgICAgICAgIG5ld19iaWQgPSBvbGRfYmlkLnJlcGxhY2UoJ2NvbS5hcHBsZS5UZXJtaW5hbCcsICdjb20uamFzb25xdWlsZXMudGVybWluYWwnKQogICAgICAgICAgICAgICAgICAgIHBsaXN0WydDRkJ1bmRsZUlkZW50aWZpZXInXSA9IG5ld19iaWQKICAgICAgICAgICAgICAgICAgICBwcmludChmJyAgTmV3OiB7bmV3X2JpZH0nKQogICAgICAgICAgICAgICAgd2l0aCBvcGVuKHBsaXN0X3BhdGgsICd3YicpIGFzIGY6CiAgICAgICAgICAgICAgICAgICAgcGxpc3RsaWIuZHVtcChwbGlzdCwgZikKICAgICAgICAgICAgICAgIHByaW50KCcgIFVwZGF0ZWQnKQogICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgICAgICAgICBwcmludChmJyAgRXJyb3I6IHtlfScpCnByaW50KCdEb25lJyk=" | base64 -d | python3
         
         echo "=== Signing dylib ==="
         codesign --force --sign - \
