@@ -58,7 +58,6 @@ jobs:
         echo "=== Looking for app ==="
         APP_PATH=$(find a-shell/Payload -name "*.app" -type d 2>/dev/null | head -1)
         echo "Found app: $APP_PATH"
-        echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
         
         if [ -z "$APP_PATH" ]; then
           echo "ERROR: No .app found"
@@ -67,53 +66,40 @@ jobs:
         
         cp TerminalSBX.dylib "$APP_PATH/"
         
-        # Use Python to fix all Bundle IDs
+        # Use Python to fix all Bundle IDs (single line)
         echo "=== Fixing Bundle IDs with Python ==="
-        python3 << 'PYEOF'
+        python3 -c "
 import os
 import plistlib
 
-app_path = os.environ.get('APP_PATH', '')
-if not app_path:
-    print("ERROR: APP_PATH not set")
-    exit(1)
+app_path = '$APP_PATH'
+print(f'Processing: {app_path}')
 
-print(f"Processing: {app_path}")
-
-# Find all Info.plist files
 for root, dirs, files in os.walk(app_path):
     for file in files:
-        if file == "Info.plist":
+        if file == 'Info.plist':
             plist_path = os.path.join(root, file)
-            print(f"Found: {plist_path}")
-            
+            print(f'Found: {plist_path}')
             try:
                 with open(plist_path, 'rb') as f:
                     plist = plistlib.load(f)
-                
                 old_bid = plist.get('CFBundleIdentifier', '')
-                print(f"  Old Bundle ID: {old_bid}")
-                
-                # Fix Bundle ID
+                print(f'  Old: {old_bid}')
                 if '623SFGS4B7' in old_bid:
                     new_bid = old_bid.replace('.623SFGS4B7', '')
                     plist['CFBundleIdentifier'] = new_bid
-                    print(f"  New Bundle ID: {new_bid}")
+                    print(f'  New: {new_bid}')
                 elif 'com.apple.Terminal' in old_bid:
                     new_bid = old_bid.replace('com.apple.Terminal', 'com.jasonquiles.terminal')
                     plist['CFBundleIdentifier'] = new_bid
-                    print(f"  New Bundle ID: {new_bid}")
-                
-                # Write back
+                    print(f'  New: {new_bid}')
                 with open(plist_path, 'wb') as f:
                     plistlib.dump(plist, f)
-                print(f"  ✓ Updated")
-                
+                print('  Updated')
             except Exception as e:
-                print(f"  ✗ Error: {e}")
-
-print("Done fixing Bundle IDs")
-PYEOF
+                print(f'  Error: {e}')
+print('Done')
+"
         
         echo "=== Signing dylib ==="
         codesign --force --sign - \
