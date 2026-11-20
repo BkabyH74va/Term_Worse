@@ -339,9 +339,6 @@ static void sbx_open_command_url(NSString *command) {
 }
 
 static void sbx_open_sandbox_list(void) {
-    // Run both commands through "source" in one URL.  This keeps the cwd
-    // change in the current shell session, and avoids relying on semicolon
-    // or "&&" parsing in a-Shell's URL command path.
     NSString *docs = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents"];
     NSString *scriptPath = [docs stringByAppendingPathComponent:@".sbx_start"];
     NSString *script = @"clear\ncd ~/Documents/_sandbox\nls\n";
@@ -353,9 +350,9 @@ static void sbx_open_sandbox_list(void) {
 // Global state
 // ---------------------------------------------------------------------------
 
-static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;        // handles / group / state
-static pthread_mutex_t g_query_lock = PTHREAD_MUTEX_INITIALIZER;  // one containermanager query at a time
-static pthread_mutex_t g_mount_lock = PTHREAD_MUTEX_INITIALIZER;  // serialise automount
+static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t g_query_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t g_mount_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static NSMutableArray<NSDictionary *> *g_handles = nil;
 static NSMutableSet<NSString *> *g_accessible_roots = nil;
@@ -519,13 +516,10 @@ static void sbx_resolve_group(void) {
     for (NSString *g in sbx_groups_from_entitlements()) add(g);
     for (NSString *g in sbx_groups_from_profile()) add(g);
 
-    // CHANGED: Use your App Group instead of SideStore groups
-    add(@"group.com.jasonquiles.terminal");
+    // CHANGED: Use your App Group with Team ID suffix
+    add(@"group.com.jasonquiles.terminal.623SFGS4B7");
 
     NSFileManager *fm = [NSFileManager defaultManager];
-    // The group container is sometimes not visible during the first few
-    // hundred milliseconds of app launch.  Retry briefly so commands issued
-    // immediately by a URL or .profile do not race the sandbox setup.
     for (int attempt = 0; attempt < 15; attempt++) {
         for (NSString *group in candidates) {
             NSURL *url = [fm containerURLForSecurityApplicationGroupIdentifier:group];
@@ -634,9 +628,9 @@ static int64_t sbx_worse_query(NSString *target, bool alt_flags, bool create_dir
     }
 
     xpc_object_t identifier = xpc_string_create(group.UTF8String);
-    query_set_class(query, 7); // app group
+    query_set_class(query, 7);
     query_set_group_identifiers(query, identifier);
-    query_set_part(query, 3); // Library/Caches
+    query_set_part(query, 3);
 
     if (alt_flags) {
         query_set_flags(query, 0x0000000800000000ULL);
@@ -768,8 +762,7 @@ static int64_t sbx_fallback_query(NSString *target, bool alt_flags) {
 }
 
 // ---------------------------------------------------------------------------
-// Container enumeration (needed for the Application / daemon / plugin roots,
-// whose parent directory cannot itself be granted on iOS 27)
+// Container enumeration
 // ---------------------------------------------------------------------------
 
 static NSArray<NSDictionary *> *sbx_enumerate_class(uint64_t container_class) {
@@ -819,12 +812,6 @@ static NSArray<NSDictionary *> *sbx_enumerate_class(uint64_t container_class) {
 
 // ---------------------------------------------------------------------------
 // Inode path enumeration (pathleak)
-//
-// fsgetpath() resolves a file-system object id to its absolute path without
-// requiring directory-search permission.  Scanning the inode range and
-// keeping immediate children of a root enumerates containers when a
-// containermanager query for the parent is refused.  Derived from pathleak
-// (forcequitOS, GPL-3.0).
 // ---------------------------------------------------------------------------
 
 static double sbx_now(void) {
@@ -1107,7 +1094,6 @@ static void sbx_automount(BOOL showUI) {
         NSString *mountRoot = sbx_mount_root();
         [fm createDirectoryAtPath:mountRoot withIntermediateDirectories:YES attributes:nil error:NULL];
 
-        // Clear previous mounts, keeping the manifest until it is replaced.
         NSArray<NSString *> *old = [fm contentsOfDirectoryAtPath:mountRoot error:NULL];
         for (NSString *item in old) {
             if ([item isEqualToString:@".mount_info"]) continue;
@@ -1162,9 +1148,6 @@ static void sbx_automount(BOOL showUI) {
                     [childItems addObject:@{@"path": child, @"id": @""}];
                 }
             } else {
-                // iOS 27 refuses a token for the parent of Application,
-                // InternalDaemon, PluginKitPlugin and SystemGroup.  Enumerate
-                // the individual containers with fsgetpath instead.
                 double seconds = [name isEqualToString:@"apps"] ? 12.0 : 6.0;
                 NSArray<NSString *> *leaked = sbx_pathleak(root, 2000000, seconds);
                 for (NSString *child in leaked ?: @[]) {
@@ -1234,12 +1217,8 @@ static void sbx_automount(BOOL showUI) {
         }
 
         sbx_progress_set(0.90, @"正在挂载便捷目录…");
-        // Mount Terminal's own container by bundle ID as well.  fsgetpath()
-        // does not always report the calling process's own container during
-        // the scan, but no extension is needed for it.
         NSString *ownRoot = NSHomeDirectory();
         NSString *ownBid = [[NSBundle mainBundle] bundleIdentifier];
-        // CHANGED: Use your Bundle ID instead of com.apple.Terminal
         if (ownBid.length == 0) ownBid = @"com.jasonquiles.terminal";
         NSString *appsDest = [mountRoot stringByAppendingPathComponent:@"apps"];
         [fm createDirectoryAtPath:appsDest withIntermediateDirectories:YES attributes:nil error:NULL];
@@ -1257,7 +1236,6 @@ static void sbx_automount(BOOL showUI) {
             mounted++;
         }
 
-        // Convenience mounts inside the system group tree.
         NSString *gestalt = @"/private/var/containers/Shared/SystemGroup/systemgroup.com.apple.mobilegestaltcache/Library/Caches";
         if (sbx_path_exists(gestalt) && sbx_grant_mount(gestalt) > 0) {
             if (sbx_symlink(gestalt, [mountRoot stringByAppendingPathComponent:@"gestalt"])) mounted++;
@@ -1294,15 +1272,10 @@ static void *sbx_automount_thread(void *arg) {
 
 __attribute__((constructor))
 static void sbx_initialize(void) {
-    // Every launch starts with a fresh terminal and no restored command
-    // history.  a-Shell checks keep_content before restoring terminal data,
-    // cwd and the history array.
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults setBool:NO forKey:@"keep_content"];
     [defaults synchronize];
 
-    // Do not touch Foundation before the app's run loop exists; mount on a
-    // detached thread shortly after launch.
     pthread_t thread;
     if (pthread_create(&thread, NULL, sbx_automount_thread, NULL) == 0) {
         pthread_detach(thread);
@@ -2229,7 +2202,7 @@ static NSString *sbx_cpu_arch(void) {
     int32_t subtype = 0;
     size = sizeof(subtype);
     sysctlbyname("hw.cpusubtype", &subtype, &size, NULL, 0);
-    if (cputype == 0x0100000C) { // CPU_TYPE_ARM64
+    if (cputype == 0x0100000C) {
         return subtype == 2 ? @"arm64e" : @"arm64";
     }
     return [NSString stringWithFormat:@"cputype %d", cputype];
@@ -2334,7 +2307,6 @@ int sbx_neofetch(int argc, char **argv) {
         CGFloat scale = [device[@"screenScale"] doubleValue];
         NSString *ip = sbx_local_ip();
 
-        // Apple mark from neofetch's compact "mac_small" ASCII art.
         sbx_printf("\033[1;32m       .:'\033[0m\n");
         sbx_printf("\033[1;32m    _ :'_\033[0m\n");
         sbx_printf("\033[1;33m .'`_`-'_``.\033[0m\n");
