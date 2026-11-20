@@ -33,8 +33,25 @@ jobs:
     
     - name: Download a-Shell
       run: |
-        curl -L -o a-shell.ipa "https://github.com/holzschu/a-shell/releases/download/v2.3.2/a-Shell-2.3.2.ipa"
+        # Try multiple possible URLs for a-Shell
+        curl -L -o a-shell.ipa "https://github.com/holzschu/a-shell/releases/download/2.3.2/a-Shell-2.3.2.ipa" || \
+        curl -L -o a-shell.ipa "https://github.com/holzschu/a-shell/releases/download/v2.3.2/a-shell.ipa" || \
+        curl -L -o a-shell.ipa "https://github.com/holzschu/a-shell/releases/download/2.3.2/a-shell.ipa" || \
+        curl -L -o a-shell.ipa "https://github.com/holzschu/a-shell/releases/download/v2.3.2/a-Shell.ipa"
+        
+        echo "=== Downloaded file info ==="
         ls -lh a-shell.ipa
+        file a-shell.ipa
+        
+        # Check if it's a valid ZIP
+        if ! unzip -t a-shell.ipa > /dev/null 2>&1; then
+          echo "ERROR: Downloaded file is not a valid IPA/ZIP"
+          echo "Content preview:"
+          head -c 200 a-shell.ipa
+          exit 1
+        fi
+        
+        echo "IPA is valid"
     
     - name: Inject and Sign
       run: |
