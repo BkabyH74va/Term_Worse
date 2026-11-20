@@ -1,0 +1,65 @@
+name: Build Terminal_worse
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Compile TerminalSBX
+      run: |
+        clang -arch arm64 \
+          -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+          -miphoneos-version-min=15.0 \
+          -framework Foundation \
+          -framework UIKit \
+          -framework Security \
+          -framework Metal \
+          -O2 \
+          -dynamiclib \
+          -o TerminalSBX.dylib \
+          src/TerminalSBX.m
+        
+        ls -lh TerminalSBX.dylib
+    
+    - name: Download a-Shell
+      run: |
+        curl -L -o a-shell.ipa "https://github.com/holzschu/a-shell/releases/download/v2.3.2/a-Shell-2.3.2.ipa"
+        ls -lh a-shell.ipa
+    
+    - name: Inject and Sign
+      run: |
+        unzip a-shell.ipa -d a-shell
+        
+        cp TerminalSBX.dylib a-shell/Payload/a-Shell.app/
+        
+        plutil -replace CFBundleIdentifier -string "com.jasonquiles.terminal" \
+          a-shell/Payload/a-Shell.app/Info.plist
+        
+        codesign --force --sign - \
+          --entitlements entitlements.plist \
+          a-shell/Payload/a-Shell.app/TerminalSBX.dylib
+        
+        codesign --force --sign - \
+          --entitlements entitlements.plist \
+          a-shell/Payload/a-Shell.app
+        
+        cd a-shell
+        zip -r Terminal_worse.ipa Payload/
+        cd ..
+        mv a-shell/Terminal_worse.ipa .
+        
+        ls -lh Terminal_worse.ipa
+    
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: Terminal_worse-ipa
+        path: Terminal_worse.ipa
