@@ -20,6 +20,8 @@ jobs:
           -miphoneos-version-min=15.0 \
           -framework Foundation \
           -framework UIKit \
+          -framework CoreGraphics \
+          -framework CoreFoundation \
           -framework Security \
           -framework Metal \
           -O2 \
