@@ -516,7 +516,8 @@ static void sbx_resolve_group(void) {
     for (NSString *g in sbx_groups_from_entitlements()) add(g);
     for (NSString *g in sbx_groups_from_profile()) add(g);
 
-    // CHANGED: Use your App Group with Team ID suffix
+    // AltStore appends Team ID to Bundle ID, so try both App Group formats
+    add(@"group.com.jasonquiles.terminal");
     add(@"group.com.jasonquiles.terminal.623SFGS4B7");
 
     NSFileManager *fm = [NSFileManager defaultManager];
