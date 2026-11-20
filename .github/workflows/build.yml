@@ -66,14 +66,27 @@ jobs:
         
         cp TerminalSBX.dylib "$APP_PATH/"
         
-        # Fix Bundle IDs with sed
-        echo "=== Fixing Bundle IDs with sed ==="
+        # Fix Bundle IDs with plutil
+        echo "=== Fixing Bundle IDs with plutil ==="
         find "$APP_PATH" -name "Info.plist" -type f 2>/dev/null | while read plist; do
-          # Replace com.apple.Terminal with com.jasonquiles.terminal
-          sed -i '' 's/com\.apple\.Terminal/com.jasonquiles.terminal/g' "$plist"
-          # Remove .623SFGS4B7 suffix
-          sed -i '' 's/\.623SFGS4B7//g' "$plist"
-          echo "Fixed: $plist"
+          # Get current Bundle ID
+          CURRENT_BID=$(plutil -extract CFBundleIdentifier raw "$plist" 2>/dev/null || echo "")
+          
+          if [ -n "$CURRENT_BID" ]; then
+            # Fix com.apple.Terminal -> com.jasonquiles.terminal
+            if echo "$CURRENT_BID" | grep -q "com.apple.Terminal"; then
+              NEW_BID=$(echo "$CURRENT_BID" | sed 's/com.apple.Terminal/com.jasonquiles.terminal/g')
+              plutil -replace CFBundleIdentifier -string "$NEW_BID" "$plist"
+              echo "Fixed: $CURRENT_BID -> $NEW_BID"
+            fi
+            
+            # Remove .623SFGS4B7 suffix
+            if echo "$CURRENT_BID" | grep -q ".623SFGS4B7"; then
+              NEW_BID=$(echo "$CURRENT_BID" | sed 's/.623SFGS4B7//g')
+              plutil -replace CFBundleIdentifier -string "$NEW_BID" "$plist"
+              echo "Fixed: $CURRENT_BID -> $NEW_BID"
+            fi
+          fi
         done
         
         echo "=== Signing dylib ==="
