@@ -49,35 +49,46 @@ jobs:
     
     - name: Inject and Sign
       run: |
+        set -x  # Enable debug output
+        
         unzip a-shell.ipa -d a-shell
         
-        # Handle both a-Shell.app and Terminal.app
-        APP_PATH="a-shell/Payload/a-Shell.app"
-        if [ -d "a-shell/Payload/Terminal.app" ]; then
-          APP_PATH="a-shell/Payload/Terminal.app"
-        fi
+        # Find the app
+        echo "=== Looking for app ==="
+        ls -la a-shell/Payload/
         
-        echo "Using app path: $APP_PATH"
+        APP_PATH=$(find a-shell/Payload -name "*.app" -type d | head -1)
+        echo "Found app: $APP_PATH"
+        
+        if [ -z "$APP_PATH" ]; then
+          echo "ERROR: No .app found in Payload"
+          exit 1
+        fi
         
         cp TerminalSBX.dylib "$APP_PATH/"
         
         plutil -replace CFBundleIdentifier -string "com.jasonquiles.terminal" \
           "$APP_PATH/Info.plist"
         
+        echo "=== Signing dylib ==="
         codesign --force --sign - \
           --entitlements entitlements.plist \
           "$APP_PATH/TerminalSBX.dylib"
         
+        echo "=== Signing app ==="
         codesign --force --sign - \
           --entitlements entitlements.plist \
           "$APP_PATH"
         
+        echo "=== Creating IPA ==="
         cd a-shell
         zip -r Terminal_worse.ipa Payload/
         cd ..
         mv a-shell/Terminal_worse.ipa .
         
         ls -lh Terminal_worse.ipa
+        
+        echo "=== Done ==="
     
     - name: Upload
       uses: actions/upload-artifact@v4
