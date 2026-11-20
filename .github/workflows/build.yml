@@ -33,7 +33,7 @@ jobs:
     
     - name: Download a-Shell from your release
       run: |
-        curl -L -o a-shell.ipa "https://github.com/BkabyH74va/Term_Worse/releases/download/v1.0/a-shell-2.3.2.ipa"
+        curl -L -o a-shell.ipa "https://github.com/BkabyH74va/Term_Worse/releases/download/v1.0/Terminal_fixed.ipa"
         
         echo "=== Downloaded file info ==="
         ls -lh a-shell.ipa
