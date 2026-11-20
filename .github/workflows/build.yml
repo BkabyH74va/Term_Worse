@@ -72,13 +72,24 @@ jobs:
         plutil -replace CFBundleIdentifier -string "com.jasonquiles.terminal" \
           "$APP_PATH/Info.plist"
         
-        # Change App Extension Bundle IDs
+        # Fix any Bundle IDs with Team ID appended
+        echo "=== Fixing Bundle IDs with Team ID ==="
+        find "$APP_PATH" -name "Info.plist" -type f 2>/dev/null | while read plist; do
+          CURRENT_BID=$(plutil -extract CFBundleIdentifier raw "$plist" 2>/dev/null || echo "")
+          if [[ "$CURRENT_BID" == *"623SFGS4B7"* ]]; then
+            NEW_BID="${CURRENT_BID/.623SFGS4B7/}"
+            echo "Fixing: $CURRENT_BID -> $NEW_BID"
+            plutil -replace CFBundleIdentifier -string "$NEW_BID" "$plist"
+          fi
+        done
+        
+        # Fix App Extension Bundle IDs
         echo "=== Fixing App Extension Bundle IDs ==="
         find "$APP_PATH" -name "Info.plist" -type f 2>/dev/null | while read plist; do
           CURRENT_BID=$(plutil -extract CFBundleIdentifier raw "$plist" 2>/dev/null || echo "")
           if [[ "$CURRENT_BID" == *"com.apple.Terminal"* ]]; then
             NEW_BID="${CURRENT_BID/com.apple.Terminal/com.jasonquiles.terminal}"
-            echo "Changing $CURRENT_BID to $NEW_BID"
+            echo "Changing: $CURRENT_BID -> $NEW_BID"
             plutil -replace CFBundleIdentifier -string "$NEW_BID" "$plist"
           fi
         done
